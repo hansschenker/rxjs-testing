@@ -1,75 +1,34 @@
-import { Observer, Subscriber } from "rxjs";
-
 export enum LogLevel {
     DEBUG = "DEBUG",
     INFO = "INFO",
     ERROR = "ERROR",
-    NONE = "NONE",
-}
-
-export enum TimeUnit {
-    MILLISECONDS,
-    SECONDS,
-    MINUTES,
-    HOURS,
-}
-
-/* Convert TimeUnit to Milliseconds */
-export function convertToMilliseconds(timeout: number, unit: TimeUnit): number {
-    const timeMultipliers = {
-        [TimeUnit.MILLISECONDS]: 1,
-        [TimeUnit.SECONDS]: 1000,
-        [TimeUnit.MINUTES]: 60000,
-        [TimeUnit.HOURS]: 3600000,
-    };
-    return timeout * (timeMultipliers[unit] || 1);
-}
-
-/* Async Sleep Helper */
-export function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    NONE = "NONE", // Disables logging
 }
 
 export class TestSubscriber<T> extends Subscriber<T> {
     private delegate?: Observer<T> | Subscriber<T>;
-    private onNextEvents: T[] = [];
-    private initialRequest: number;
-    private errorEvents: any[] = [];
+    private readonly initialRequest: number;
+    private readonly onNextEvents: T[] = [];
+    private readonly errorEvents: any[] = [];
     private completions = 0;
     private terminalEventReceived = false;
-    private lastEventTimestamp: string = "";
+    private lastOperationId = ""; // Changed from lastSeenThread to lastOperationId
 
     private logLevel: LogLevel = LogLevel.INFO; // Default log level
     private loggingEnabled = true; // Allow users to enable/disable logging
 
-    // Terminal event promise and resolver for efficient waiting
-    private terminalEventPromise: Promise<void>;
-    private terminalEventResolver!: () => void;
-
-    // Logging level hierarchy for filtering log messages
-    private static readonly LOG_LEVEL_HIERARCHY: Record<LogLevel, number> = {
-        [LogLevel.DEBUG]: 1,
-        [LogLevel.INFO]: 2,
-        [LogLevel.ERROR]: 3,
-        [LogLevel.NONE]: 4,
-    };
-
-    /* Constructor */
-    public constructor(
+    /**
+     * @param delegate - An optional observer or subscriber to delegate events to.
+     * @param initialRequest - Number of items to request initially from the Observable.
+     */
+    private constructor(
         delegate?: Observer<T> | Subscriber<T>,
         initialRequest: number = Number.POSITIVE_INFINITY
     ) {
         super();
         this.delegate = delegate;
         this.initialRequest = initialRequest;
-        this.initializeTerminalEventPromise();
-    }
-
-    // Initialize the terminal event promise and its resolver.
-    private initializeTerminalEventPromise(): void {
-        this.terminalEventPromise = new Promise<void>((resolve) => {
-            this.terminalEventResolver = resolve;
-        });
+        this.request(initialRequest);
     }
 
     /* Factory Methods */
@@ -89,93 +48,54 @@ export class TestSubscriber<T> extends Subscriber<T> {
         return new TestSubscriber<T>(delegate, initialRequest);
     }
 
-    /* Logging Utility */
+    /**
+     * Logs messages if logging is enabled and matches the current log level.
+     * @param level - The log level for this message.
+     * @param message - The message to log.
+     * @param args - Additional arguments for the log message.
+     */
     private log(level: LogLevel, message: string, ...args: any[]): void {
-        if (!this.loggingEnabled || this.logLevel === LogLevel.NONE) return;
-        if (TestSubscriber.LOG_LEVEL_HIERARCHY[level] >= TestSubscriber.LOG_LEVEL_HIERARCHY[this.logLevel]) {
+        if (!this.loggingEnabled || level === LogLevel.NONE) return;
+        if (this.logLevel === LogLevel.DEBUG || this.logLevel === level) {
             console.log(`[${new Date().toISOString()}] [${level}] ${message}`, ...args);
         }
     }
 
-    /* Enable/Disable Logging */
     public setLoggingEnabled(enabled: boolean): void {
         this.loggingEnabled = enabled;
     }
 
-    /* Set Logging Level */
     public setLogLevel(level: LogLevel): void {
+        if (!Object.values(LogLevel).includes(level)) {
+            throw new Error(`Invalid log level: ${level}`);
+        }
         this.logLevel = level;
     }
 
-    /* Observer Overrides */
-    public next(value: T): void {
-        if (this.onNextEvents.length < this.initialRequest) {
-            this.onNext(value);
-        } else {
-            this.log(LogLevel.DEBUG, `Ignoring event as initial request limit of ${this.initialRequest} reached`);
-        }
-    }
-
-    public error(err: any): void {
-        this.onError(err);
-    }
-
-    public complete(): void {
-        this.onCompleted();
-    }
-
-    /* Internal Event Handlers */
+    /* Observer Implementation */
     public onNext(value: T): void {
         this.onNextEvents.push(value);
-        this.lastEventTimestamp = `Timestamp-${Date.now()}`;
+        this.lastOperationId = `Operation-${Date.now()}`;
         this.log(LogLevel.DEBUG, `onNext called with value: ${value}`);
-        try {
-            this.delegate?.next(value);
-        } catch (e) {
-            this.log(LogLevel.ERROR, "Delegate next error:", e);
-        }
+        this.delegate?.onNext(value);
     }
 
     public onError(error: any): void {
         this.errorEvents.push(error);
         this.terminalEventReceived = true;
-        this.lastEventTimestamp = `Timestamp-${Date.now()}`;
+        this.lastOperationId = `Operation-${Date.now()}`;
         this.log(LogLevel.ERROR, `onError called with error:`, error);
-        try {
-            this.delegate?.error(error);
-        } catch (e) {
-            this.log(LogLevel.ERROR, "Delegate error callback threw an exception:", e);
-        }
-        // Resolve the terminal event promise
-        if (this.terminalEventResolver) {
-            this.terminalEventResolver();
-            this.terminalEventResolver = () => {}; // Prevent multiple calls
-        }
+        this.delegate?.onError(error);
     }
 
     public onCompleted(): void {
         this.completions++;
         this.terminalEventReceived = true;
-        this.lastEventTimestamp = `Timestamp-${Date.now()}`;
+        this.lastOperationId = `Operation-${Date.now()}`;
         this.log(LogLevel.INFO, `onCompleted called`);
-        try {
-            this.delegate?.complete();
-        } catch (e) {
-            this.log(LogLevel.ERROR, "Delegate complete callback threw an exception:", e);
-        }
-        // Resolve the terminal event promise
-        if (this.terminalEventResolver) {
-            this.terminalEventResolver();
-            this.terminalEventResolver = () => {}; // Prevent multiple calls
-        }
+        this.delegate?.onCompleted();
     }
 
-    /* Deep equality check for assertions */
-    private isEqual(a: any, b: any): boolean {
-        return JSON.stringify(a) === JSON.stringify(b);
-    }
-
-    /* Assertions */
     private fail(message: string): never {
         this.log(LogLevel.ERROR, message);
         throw new Error(message);
@@ -198,39 +118,24 @@ export class TestSubscriber<T> extends Subscriber<T> {
             this.fail(`Expected ${expected.length} values, but received ${this.onNextEvents.length}: ${this.onNextEvents}`);
         }
         expected.forEach((value, index) => {
-            if (!this.isEqual(this.onNextEvents[index], value)) {
-                this.fail(
-                    `Value mismatch at index ${index}: expected ${JSON.stringify(value)}, but received ${JSON.stringify(
-                        this.onNextEvents[index]
-                    )}`
-                );
+            if (this.onNextEvents[index] !== value) {
+                this.fail(`Value mismatch at index ${index}: expected ${value}, but received ${this.onNextEvents[index]}`);
             }
         });
     }
 
-    /* Await Methods */
     public async awaitTerminalEvent(timeoutMs: number = 5000): Promise<void> {
-        await Promise.race([
-            this.terminalEventPromise,
-            sleep(timeoutMs).then(() => {
+        const start = Date.now();
+        while (!this.terminalEventReceived) {
+            if (Date.now() - start > timeoutMs) {
                 this.fail("Timeout waiting for terminal event");
-            }),
-        ]);
+            }
+            await this.sleep(10);
+        }
     }
 
-    /* State Reset Capability */
-    /**
-     * Resets the internal state of the TestSubscriber, clearing recorded events,
-     * errors, completions, and reinitializing the terminal event promise.
-     */
-    public reset(): void {
-        this.onNextEvents = [];
-        this.errorEvents = [];
-        this.completions = 0;
-        this.terminalEventReceived = false;
-        this.lastEventTimestamp = "";
-        this.initializeTerminalEventPromise();
-        this.log(LogLevel.DEBUG, "TestSubscriber state has been reset.");
+    private async sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     /* Getters */
@@ -246,15 +151,7 @@ export class TestSubscriber<T> extends Subscriber<T> {
         return this.completions;
     }
 
-    public getLastEventTimestamp(): string {
-        return this.lastEventTimestamp;
-    }
-
-    /* Enhanced Unsubscription Cleanup */
-    public unsubscribe(): void {
-        super.unsubscribe();
-        // Enhanced cleanup logic: Reset state and clear any lingering references
-        this.reset();
-        this.log(LogLevel.DEBUG, "TestSubscriber has been unsubscribed and cleaned up.");
+    public getLastOperationId(): string {
+        return this.lastOperationId;
     }
 }
