@@ -15,64 +15,55 @@ RxJS-TestSubscriber is a **powerful RxJS testing utility** designed to make **ob
 - **Async test support** with `awaitTerminalEvent()`.
 - **Fully TypeScript-ready**.
 
----
 
-## 📦 Installation
 
-Install via npm:
+## 🌊 **TestSubscriber&lt;T&gt; Workflow**
 
-```sh
-npm install rxjs-testsubscriber
-
-Mermaid diagram
-``` mermaid
-
-### 🌊 **TestSubscriber<T> Workflow**
 ```mermaid
-graph TD
-    
-    subgraph TestSubscriber<T>
-        A[subscribe(observer)] -->|onNext(value)| B{Store value}
-        B --> C[Push to onNextEvents]
-        B -->|Logging| L1[Log Debug Event]
+graph LR
+    subgraph TestSubscriber
+        A["subscribe observer"] -->|onNext value| B["Store value"]
+        B --> C["Push to onNextEvents"]
+        B -->|Logging| L1["Log Debug Event"]
 
-        A -->|onError(error)| D{Error Handling}
-        D --> E[Push to errorEvents]
-        D -->|Logging| L2[Log Error Event]
-        D -->|Mark as terminal event| F[Set terminalEventReceived]
+        A -->|onErro error| D["Error Handling"]
+        D --> E["Push to errorEvents"]
+        D -->|Logging| L2["Log Error Event"]
+        D -->|Mark as terminal event| F["Set terminalEventReceived"]
 
-        A -->|onCompleted()| G{Completion Handling}
-        G --> H[Increment completions]
-        G -->|Logging| L3[Log Completion Event]
+        A -->|onCompleted| G["Completion Handling"]
+        G --> H["Increment completions"]
+        G -->|Logging| L3["Log Completion Event"]
         G -->|Mark as terminal event| F
 
         subgraph Assertions
-            I[assertValues] --> |Compare with stored events| J{Pass/Fail}
-            K[assertCompleted] --> |Check completions| J
-            M[assertNoErrors] --> |Check errorEvents| J
+            I["assertValues"] --> |Compare with stored events| J["Pass/Fail"]
+            K["assertCompleted"] --> |Check completions| J
+            M["assertNoErrors"] --> |Check errorEvents| J
         end
 
         subgraph Logging
-            L1 --> L4[Log onNext]
-            L2 --> L5[Log onError]
-            L3 --> L6[Log onCompleted]
+            L1 --> L4["Log onNext"]
+            L2 --> L5["Log onError"]
+            L3 --> L6["Log onCompleted"]
         end
 
         subgraph Async Testing
-            N[awaitTerminalEvent] --> |Loop until terminalEventReceived| F
+            N["awaitTerminalEvent"] --> |Loop until terminalEventReceived| F
         end
     end
 
     subgraph Observable
-        O[Emit Values] --> P[Pass to TestSubscriber]
+        O["Emit Values"] --> P["Pass to TestSubscriber"]
     end
 
     P --> A
-
+```
 
 ---
 
-## **📌 Explanation of the Diagram**
+## **📌 Explanation of the Diagram**$
+
 | **Component** | **Description** |
 |--------------|----------------|
 | 🟢 `onNext(value)` | Stores emitted values in `onNextEvents`. |
@@ -84,48 +75,28 @@ graph TD
 
 ---
 
-## **📌 Adding the Diagram to `README.md`**
-To include this **Mermaid diagram** in your **GitHub README**, add the following section:
 
-```markdown
-## 🌊 TestSubscriber<T> Workflow (Mermaid Diagram)
+## Rxjs TestObserver
+
 ```mermaid
-graph TD;
-    
-    subgraph TestSubscriber<T>
-        A[subscribe(observer)] -->|onNext(value)| B{Store value}
-        B --> C[Push to onNextEvents]
-        B -->|Logging| L1[Log Debug Event]
+flowchart LR
+    A["Observable"] -- subscribe --> B["TestObserver.subscribeTo"]
+    B -- calls subscribe() --> C["TestObserver.onSubscribe()"]
+    C -- captures subscription --> D["Subscription"]
+    C -- logs 'onSubscribe: subscription set' --> H["Log Events"]
+    C -- forwards event --> I["Delegate Observer (optional)"]
+    A -- emits next --> E["TestObserver.next(value)"]
+    E -- logs 'next: value' --> H
+    E -- forwards event --> I
+    A -- emits error --> F["TestObserver.error(err)"]
+    F -- logs 'error: err' --> H
+    F -- forwards event --> I
+    A -- emits complete --> G["TestObserver.complete()"]
+    G -- logs 'complete' --> H
+    G -- forwards event --> I
+    K["TestObserver.onSuccess(value)"] -- logs 'onSuccess: value' --> H
+    K -- forwards event --> I
+    J["TestObserver.dispose()"] -- calls unsubscribe() on Subscription --> D
+    J -- logs 'dispose called' & 'subscription unsubscribed' --> H
 
-        A -->|onError(error)| D{Error Handling}
-        D --> E[Push to errorEvents]
-        D -->|Logging| L2[Log Error Event]
-        D -->|Mark as terminal event| F[Set terminalEventReceived]
-
-        A -->|onCompleted()| G{Completion Handling}
-        G --> H[Increment completions]
-        G -->|Logging| L3[Log Completion Event]
-        G -->|Mark as terminal event| F
-
-        subgraph Assertions
-            I[assertValues] --> |Compare with stored events| J{Pass/Fail}
-            K[assertCompleted] --> |Check completions| J
-            M[assertNoErrors] --> |Check errorEvents| J
-        end
-
-        subgraph Logging
-            L1 --> L4[Log onNext]
-            L2 --> L5[Log onError]
-            L3 --> L6[Log onCompleted]
-        end
-
-        subgraph Async Testing
-            N[awaitTerminalEvent] --> |Loop until terminalEventReceived| F
-        end
-    end
-
-    subgraph Observable
-        O[Emit Values] --> P[Pass to TestSubscriber]
-    end
-
-    P --> A
+```

@@ -1,7 +1,7 @@
 {
-  "name": "rxjs-testsubscriber",
+  "name": "rxjs-testing",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.9",
   "type": "module",
   "author": {
     "name": "Hans Schenker",
