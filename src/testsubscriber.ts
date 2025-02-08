@@ -1,3 +1,5 @@
+import { Observer, Subscriber } from "rxjs";
+
 export enum LogLevel {
     DEBUG = "DEBUG",
     INFO = "INFO",
@@ -23,12 +25,12 @@ export class TestSubscriber<T> extends Subscriber<T> {
      */
     private constructor(
         delegate?: Observer<T> | Subscriber<T>,
-        initialRequest: number = Number.POSITIVE_INFINITY
+         initialRequest: number = Number.POSITIVE_INFINITY
     ) {
         super();
         this.delegate = delegate;
-        this.initialRequest = initialRequest;
-        this.request(initialRequest);
+         this.initialRequest = initialRequest;
+         // Removed as 'request' method does not exist
     }
 
     /* Factory Methods */
@@ -77,7 +79,7 @@ export class TestSubscriber<T> extends Subscriber<T> {
         this.onNextEvents.push(value);
         this.lastOperationId = `Operation-${Date.now()}`;
         this.log(LogLevel.DEBUG, `onNext called with value: ${value}`);
-        this.delegate?.onNext(value);
+        this.delegate?.next(value);
     }
 
     public onError(error: any): void {
@@ -85,7 +87,7 @@ export class TestSubscriber<T> extends Subscriber<T> {
         this.terminalEventReceived = true;
         this.lastOperationId = `Operation-${Date.now()}`;
         this.log(LogLevel.ERROR, `onError called with error:`, error);
-        this.delegate?.onError(error);
+        this.delegate?.error(error);
     }
 
     public onCompleted(): void {
@@ -93,7 +95,7 @@ export class TestSubscriber<T> extends Subscriber<T> {
         this.terminalEventReceived = true;
         this.lastOperationId = `Operation-${Date.now()}`;
         this.log(LogLevel.INFO, `onCompleted called`);
-        this.delegate?.onCompleted();
+        this.delegate?.complete();
     }
 
     private fail(message: string): never {

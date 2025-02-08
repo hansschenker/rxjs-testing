@@ -29,7 +29,7 @@ Mermaid diagram
 
 ### 🌊 **TestSubscriber<T> Workflow**
 ```mermaid
-graph TD;
+graph TD
     
     subgraph TestSubscriber<T>
         A[subscribe(observer)] -->|onNext(value)| B{Store value}
